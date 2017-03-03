@@ -1,0 +1,772 @@
+{
+	"AWSTemplateFormatVersion": "2010-09-09",
+	"Description": "AWS CloudFormation Template for Security Monkey (master branch code / v0.8.0 (2017-02-21)). With EC2 instance, Multi AZ RDS Postgres database, Security group, it creates a VPC and all needed subnets",
+	"Parameters": {
+		"AZ1": {
+			"Type": "AWS::EC2::AvailabilityZone::Name",
+			"Description": "Availabiltiy zone where Security Monkey will be deployed",
+			"ConstraintDescription": "Must be a valid EC2 Availabilty zone"
+		},
+		"AZ2": {
+			"Type": "AWS::EC2::AvailabilityZone::Name",
+			"Description": "Second availabiltiy zone (used for Muilti AZ RDS instance)",
+			"ConstraintDescription": "Must be a valid EC2 Availabilty zone"
+		},
+		"SecurityMonkeyInstanceProfileRole" : {
+        "Description" : "Select your SecurityMonkeyInstanceProfile role. It MUST be previously created following all of these instructions: https://github.com/Netflix/security_monkey/blob/master/docs/quickstart.rst#setup-iam-roles",
+        "Type" : "String",
+        "AllowedValues" : [ "SecurityMonkeyInstanceProfile" ],
+        "ConstraintDescription" : "Must be a valid IAM Role"
+    },
+		"SecurityMonkeyInstanceType": {
+			"Description": "EC2 instance type",
+			"Type": "String",
+			"Description": "Type of EC2 instance for the Security Monkey instance. REMEMBER TO ACCEPT Ubuntu 16.04 LTS AMI terms: https://aws.amazon.com/marketplace/fulfillment?productId=c054adcf-4ce8-470c-91c7-1a4f4e07eeed",
+			"Default": "m3.large",
+			"AllowedValues": [
+				"t2.medium",
+				"t2.large",
+				"m4.large",
+				"m4.xlarge",
+				"m4.2xlarge",
+				"m4.4xlarge",
+				"m4.10xlarge",
+				"m3.medium",
+				"m3.large",
+				"m3.xlarge",
+				"m3.2xlarge",
+				"m4.xlarge",
+				"c4.large",
+				"c4.xlarge",
+				"c4.2xlarge",
+				"c4.4xlarge",
+				"c4.8xlarge",
+				"c3.large",
+				"c3.xlarge",
+				"c3.2xlarge",
+				"c3.4xlarge",
+				"c3.8xlarge",
+				"r3.large",
+				"r3.xlarge"
+			],
+			"ConstraintDescription": "Must contain valid instance type"
+		},
+		"KeyName": {
+			"Type": "AWS::EC2::KeyPair::KeyName",
+			"Description": "Name of an existing EC2 KeyPair, instance will launch with this KeyPair"
+		},
+		"RDSDBName": {
+			"Description": "The name of the Postgres DB to be used, it will be created in RDS",
+			"Type": "String",
+			"Default": "securitymonkey"
+		},
+		"RDSUsername": {
+			"Description": "The name of the Postgres user that will connect to the DB",
+			"Type": "String",
+			"Default": "securitymonkey"
+		},
+		"RDSPassword": {
+			"Description": "The password connect to the DB",
+			"Type": "String",
+			"Default": "sec_mky_pwd_here_1o1o22idk"
+		},
+		"RDSPort": {
+			"Description": "The port to connect to the DB (Postgresql port)",
+			"Type": "String",
+			"Default": "5432"
+		},
+		"RDSInstanceType": {
+			"Default": "db.m3.medium",
+			"Description": "Instance type for the Postgres DB instance",
+			"Type": "String",
+			"AllowedValues": [
+				"db.t2.small",
+				"db.t2.medium",
+				"db.t2.large",
+				"db.m3.medium",
+				"db.m3.large",
+				"db.m3.xlarge",
+				"db.m3.2xlarge",
+				"db.r3.large",
+				"db.r3.xlarge",
+				"db.r3.2xlarge",
+				"db.r3.4xlarge",
+				"db.r3.8xlarge",
+				"db.t2.micro",
+				"db.t2.small",
+				"db.t2.medium",
+				"db.t2.large",
+				"db.m4.medium",
+				"db.m4.large",
+				"db.m4.xlarge"
+			],
+			"ConstraintDescription": "Must contain valid RDS instance type"
+		},
+		"RDSAllocatedStorage": {
+			"Description": "RDS instance storage size in GB",
+			"Type": "String",
+			"Default": "5"
+		},
+		"FromNetwork": {
+			"Description": "Network IP in CIDR format from where you will access to the Security Monkey server SSH and HTTPS",
+			"Type": "String",
+			"MinLength": "9",
+			"MaxLength": "18",
+			"Default": "0.0.0.0/0",
+			"AllowedPattern": "(\\d{1,3})\\.(\\d{1,3})\\.(\\d{1,3})\\.(\\d{1,3})/(\\d{1,2})",
+			"ConstraintDescription": "Must be a valid CIDR range of the form x.x.x.x/x."
+		},
+		"SMLogLevel": {
+			"Description": "Security Monkey Log Level",
+			"Type": "String",
+			"Default": "DEBUG"
+		},
+		"SMMailDefaultSender": {
+			"Description": "Security Monkey mail default sender",
+			"Type": "String",
+			"Default": "securitymonkey@example.com"
+		},
+		"SMSecurityTeamEmail": {
+			"Description": "This address gets all change notifications from Security Monkey",
+			"Type": "String",
+			"Default": "securityteam@example.com"
+		},
+		"SMUseSMTP": {
+			"Description": "These is only required if using SMTP instead of SES",
+			"Type": "String",
+			"Default": "False"
+		},
+		"SMMailServer": {
+			"Description": "These is only required if using SMTP instead of SES",
+			"Type": "String",
+			"Default": "smtp.example.com"
+		},
+		"SMMailPort": {
+			"Description": "These is only required if using SMTP instead of SES",
+			"Type": "String",
+			"Default": "465"
+		},
+		"SMMailUserName": {
+			"Description": "These is only required if using SMTP instead of SES",
+			"Type": "String",
+			"Default": "username@example.com"
+		},
+		"SMMailPassword": {
+			"Description": "These is only required if using SMTP instead of SES",
+			"Type": "String",
+			"Default": "password"
+		}
+	},
+	"Mappings": {
+		"LINUXAMI": {
+			"us-east-1": {
+				"AMI": "ami-d051c4c7"
+			},
+			"us-east-2": {
+				"AMI": "ami-88b6eced"
+			},
+			"us-west-1": {
+				"AMI": "ami-920040f2"
+			},
+			"us-west-2": {
+				"AMI": "ami-7905ca19"
+			},
+			"eu-west-1": {
+				"AMI": "ami-44eb8637"
+			},
+			"eu-central-1": {
+				"AMI": "ami-d37084bc"
+			},
+			"ap-southeast-1": {
+				"AMI": "ami-c3f12ea0"
+			},
+			"ap-southeast-2": {
+				"AMI": "ami-c6c2f9a5"
+			},
+			"ap-northeast-1": {
+				"AMI": "ami-90117af7"
+			},
+			"ap-northeast-2": {
+				"AMI": "ami-d1a274bf"
+			},
+			"sa-east-1": {
+				"AMI": "ami-707ce41c"
+			},
+			"ca-central-1": {
+				"AMI": "ami-374dff53"
+			},
+			"ap-south-1": {
+				"AMI": "ami-dac6b1b5"
+			}
+		},
+		"SubnetConfig": {
+			"VPC": {
+				"CIDR": "10.0.0.0/16"
+			},
+			"SecurityMonkeySubnetIP": {
+				"CIDR": "10.0.10.0/24"
+			},
+			"RDSSubnet1": {
+				"CIDR": "10.0.100.0/24"
+			},
+			"RDSSubnet2": {
+				"CIDR": "10.0.200.0/24"
+			}
+		}
+	},
+	"Resources": {
+		"VPC": {
+			"Type": "AWS::EC2::VPC",
+			"Properties": {
+				"CidrBlock": {
+					"Fn::FindInMap": [
+						"SubnetConfig",
+						"VPC",
+						"CIDR"
+					]
+				},
+				"InstanceTenancy": "default",
+				"EnableDnsSupport" : "true",
+				"EnableDnsHostnames" : "true",
+				"Tags": [{
+					"Key": "Name",
+					"Value": "SecurityMonkeyVPC"
+				}]
+			}
+		},
+		"InternetGateway": {
+			"Type": "AWS::EC2::InternetGateway"
+		},
+		"AttachGateway": {
+			"Type": "AWS::EC2::VPCGatewayAttachment",
+			"Properties": {
+				"VpcId": {
+					"Ref": "VPC"
+				},
+				"InternetGatewayId": {
+					"Ref": "InternetGateway"
+				}
+			}
+		},
+		"SecurityMonkeySubnet": {
+			"Type": "AWS::EC2::Subnet",
+			"Properties": {
+				"VpcId": {
+					"Ref": "VPC"
+				},
+				"CidrBlock": {
+					"Fn::FindInMap": [
+						"SubnetConfig",
+						"SecurityMonkeySubnetIP",
+						"CIDR"
+					]
+				},
+				"MapPublicIpOnLaunch": "true",
+				"Tags": [{
+					"Key": "Application",
+					"Value": "SecurityMonkey"
+				}, {
+					"Key": "Network",
+					"Value": "Public"
+				}],
+				"AvailabilityZone": {
+					"Ref": "AZ1"
+				}
+			}
+		},
+		"RouteTable": {
+			"Type": "AWS::EC2::RouteTable",
+			"Properties": {
+				"VpcId": {
+					"Ref": "VPC"
+				}
+			}
+		},
+		"AssociateRouteTable": {
+			"Type": "AWS::EC2::SubnetRouteTableAssociation",
+			"Properties": {
+				"RouteTableId": {
+					"Ref": "RouteTable"
+				},
+				"SubnetId": {
+					"Ref": "SecurityMonkeySubnet"
+				}
+			}
+		},
+		"Route": {
+			"Type": "AWS::EC2::Route",
+			"Properties": {
+				"DestinationCidrBlock": "0.0.0.0/0",
+				"GatewayId": {
+					"Ref": "InternetGateway"
+				},
+				"RouteTableId": {
+					"Ref": "RouteTable"
+				}
+			}
+		},
+		"RDSSubnet1": {
+			"Type": "AWS::EC2::Subnet",
+				"Properties": {
+					"VpcId": {
+						"Ref": "VPC"
+				},
+					"CidrBlock": {
+						"Fn::FindInMap": [
+								"SubnetConfig",
+								"RDSSubnet1",
+								"CIDR"
+						]
+				},
+					"Tags": [
+						{
+								"Key": "Application",
+								"Value": "RDS"
+						},
+						{
+								"Key": "Network",
+								"Value": "Private"
+						}
+				],
+					"AvailabilityZone": {
+						"Ref": "AZ1"
+				}
+			}
+		},
+		"RDSSubnet2": {
+				"Type": "AWS::EC2::Subnet",
+				"Properties": {
+						"VpcId": {
+								"Ref": "VPC"
+						},
+						"CidrBlock": {
+								"Fn::FindInMap": [
+										"SubnetConfig",
+										"RDSSubnet2",
+										"CIDR"
+								]
+						},
+						"Tags": [
+								{
+										"Key": "Application",
+										"Value": "RDS"
+								},
+								{
+										"Key": "Network",
+										"Value": "Private"
+								}
+						],
+						"AvailabilityZone": {
+								"Ref": "AZ2"
+						}
+				}
+		},
+		"SecurityMonkeyUser": {
+			"Type": "AWS::IAM::User",
+			"Properties": {
+				"Policies": [{
+					"PolicyName": "cfn",
+					"PolicyDocument": {
+						"Statement": [{
+							"Effect": "Allow",
+							"Action": "cloudformation:DescribeStackResource",
+							"Resource": "*"
+						}, {
+							"Effect": "Allow",
+							"Action": "elasticloadbalancing:*",
+							"Resource": "*"
+						}, {
+							"Effect": "Allow",
+							"Action": [
+								"autoscaling:*"
+							],
+							"Resource": "*"
+						}, {
+							"Effect": "Allow",
+							"Action": [
+								"ec2:*"
+							],
+							"Resource": "*"
+						}, {
+							"Effect": "Allow",
+							"Action": [
+								"cloudwatch:PutMetricData",
+								"cloudwatch:EnableAlarmActions",
+								"cloudwatch:PutMetricAlarm"
+							],
+							"Resource": "*"
+						}, {
+							"Resource": "*",
+							"Action": [
+								"s3:List*"
+							],
+							"Effect": "Allow"
+						}]
+					}
+				}]
+			}
+		},
+		"CfnKeys": {
+			"Type": "AWS::IAM::AccessKey",
+			"Properties": {
+				"UserName": {
+					"Ref": "SecurityMonkeyUser"
+				}
+			}
+		},
+		"SecurityMonkeySecurityGroup": {
+			"Type": "AWS::EC2::SecurityGroup",
+			"Properties": {
+				"GroupDescription": "Group for the Security Monkey instance",
+				"VpcId": {
+					"Ref": "VPC"
+				},
+				"SecurityGroupIngress": [{
+					"IpProtocol": "tcp",
+					"FromPort": "443",
+					"ToPort": "443",
+					"CidrIp": {
+						"Ref": "FromNetwork"
+					}
+				}, {
+					"IpProtocol": "tcp",
+					"FromPort": "22",
+					"ToPort": "22",
+					"CidrIp": {
+						"Ref": "FromNetwork"
+					}
+				}]
+			}
+		},
+		"SecurityMonkeySecurityGroupRDS": {
+			"Type": "AWS::EC2::SecurityGroup",
+			"Properties": {
+				"GroupDescription": "Group for the Security Monkey DB",
+				"VpcId": { "Ref": "VPC"	},
+				"SecurityGroupIngress": [{
+					"IpProtocol": "tcp",
+					"FromPort": "5432",
+					"ToPort": "5432",
+					"SourceSecurityGroupId": {
+						"Fn::GetAtt": [
+							"SecurityMonkeySecurityGroup",
+							"GroupId"
+						]
+					}
+				}]
+			}
+		},
+		"RDSDBSubnetGroup": {
+				"Type": "AWS::RDS::DBSubnetGroup",
+				"Properties": {
+						"DBSubnetGroupDescription": "RDS subnet group",
+						"SubnetIds" : [ { "Ref" : "RDSSubnet1" }, { "Ref" : "RDSSubnet2" } ]
+				}
+		},
+		"SecurityMonkeyRDS": {
+			"Type": "AWS::RDS::DBInstance",
+			"Properties": {
+				"MultiAZ": "true",
+				"AllowMajorVersionUpgrade": true,
+				"AutoMinorVersionUpgrade": true,
+				"DBInstanceIdentifier": { "Ref": "RDSDBName" },
+				"DBName": { "Ref": "RDSDBName" },
+				"Engine": "postgres",
+				"Port": { "Ref": "RDSPort" },
+				"MasterUsername": { "Ref": "RDSUsername" },
+				"MasterUserPassword": { "Ref": "RDSPassword" },
+				"DBInstanceClass": { "Ref": "RDSInstanceType" },
+				"AllocatedStorage": { "Ref": "RDSAllocatedStorage" },
+				"VPCSecurityGroups": [ { "Ref": "SecurityMonkeySecurityGroupRDS" } ],
+				"DBSubnetGroupName": { "Ref": "RDSDBSubnetGroup" }
+			}
+		},
+		"SecurityMonkeyServer": {
+			"Type": "AWS::EC2::Instance",
+			"Properties": {
+				"IamInstanceProfile": { "Ref" : "SecurityMonkeyInstanceProfileRole" },
+				"KeyName": {
+					"Ref": "KeyName"
+				},
+				"Tags": [	{ "Key": "Name", "Value": {"Fn::Join" : ["", [  { "Ref": "AWS::StackName" }, "-SM" ]]} }],
+				"ImageId": {
+					"Fn::FindInMap": [
+						"LINUXAMI", {
+							"Ref": "AWS::Region"
+						},
+						"AMI"
+					]
+				},
+				"AvailabilityZone": {
+					"Ref": "AZ1"
+				},
+				"SubnetId": {
+					"Ref": "SecurityMonkeySubnet"
+				},
+				"InstanceType": {
+					"Ref": "SecurityMonkeyInstanceType"
+				},
+				"SecurityGroupIds": [{
+					"Ref": "SecurityMonkeySecurityGroup"
+				}],
+				"UserData": {
+					"Fn::Base64": {
+						"Fn::Join": [
+							"", [
+								"#!/bin/bash -ex\n",
+								"sudo apt-get update\n",
+								"sudo apt-get -y upgrade\n",
+								"sudo apt-get install -y python-pip python-dev python-psycopg2 libpq-dev nginx supervisor git libffi-dev python-setuptools libyaml-dev libpython2.7-dev\n",
+								"sudo pip install --upgrade ndg-httpsclient\n",
+								"mkdir -p aws-cfn-bootstrap-latest\n",
+								"curl https://s3.amazonaws.com/cloudformation-examples/aws-cfn-bootstrap-latest.tar.gz | tar xz -C aws-cfn-bootstrap-latest --strip-components 1\n",
+								"sudo easy_install aws-cfn-bootstrap-latest\n",
+								"/usr/local/bin/cfn-init",
+								"    --stack ", {
+									"Ref": "AWS::StackName"
+								},
+								" -r SecurityMonkeyServer",
+								"    --access-key ", {
+									"Ref": "CfnKeys"
+								},
+								"    --secret-key ", {
+									"Fn::GetAtt": [
+										"CfnKeys",
+										"SecretAccessKey"
+									]
+								},
+								"    --region     ", {
+									"Ref": "AWS::Region"
+								},
+								"\n",
+								"sudo sed -i s/localhost/\"localhost $(hostname)\"/g /etc/hosts\n",
+								"sudo mkdir -p /var/log/security_monkey\n",
+								"sudo chown www-data /var/log/security_monkey\n",
+								"sudo mkdir -p /var/www\n",
+								"sudo chown www-data /var/www\n",
+								"sudo touch /var/log/security_monkey/security_monkey.error.log\n",
+								"sudo touch /var/log/security_monkey/security_monkey.access.log\n",
+								"sudo touch /var/log/security_monkey/security_monkey-deploy.log\n",
+								"sudo chown www-data /var/log/security_monkey/*.log\n",
+								"cd /usr/local/src\n",
+								"sudo git clone --depth 1 --branch master https://github.com/Netflix/security_monkey.git\n",
+								"cd security_monkey\n",
+								"sudo python setup.py install\n",
+								"cd ..\n",
+								"curl https://dl-ssl.google.com/linux/linux_signing_key.pub | sudo apt-key add -\n",
+								"cd ~\n",
+								"curl https://storage.googleapis.com/download.dartlang.org/linux/debian/dart_stable.list > dart_stable.list\n",
+								"sudo mv dart_stable.list /etc/apt/sources.list.d/dart_stable.list\n",
+								"sudo apt-get update\n",
+								"sudo apt-get install -y dart\n",
+								"cd /usr/local/src/security_monkey/dart\n",
+								"sudo /usr/lib/dart/bin/pub get\n",
+								"sudo /usr/lib/dart/bin/pub build\n",
+								"sudo /bin/mkdir -p /usr/local/src/security_monkey/security_monkey/static/\n",
+								"sudo /bin/cp -R /usr/local/src/security_monkey/dart/build/web/* /usr/local/src/security_monkey/security_monkey/static/\n",
+								"sudo sed -i 's/postgres:securitymonkeypassword@localhost:5432\\/secmonkey/", {
+									"Ref": "RDSUsername"
+								},
+								":", {
+									"Ref": "RDSPassword"
+								},
+								"@", {
+									"Fn::GetAtt": [
+										"SecurityMonkeyRDS",
+										"Endpoint.Address"
+									]
+								},
+								":", {
+									"Ref": "RDSPort"
+								},
+								"\\/", {
+									"Ref": "RDSDBName"
+								},
+								"/g' /usr/local/src/security_monkey/env-config/config-deploy.py\n",
+								"export INSTANCE_PUBLIC_HOST_NAME=$(curl -s http://169.254.169.254/latest/meta-data/public-hostname)\n",
+								"sudo sed -i s/ec2-XX-XXX-XXX-XXX.compute-1.amazonaws.com/$INSTANCE_PUBLIC_HOST_NAME/g /usr/local/src/security_monkey/env-config/config-deploy.py\n",
+								"export RANDOM_KEY=$(date +%s | sha256sum | base64 | head -c 32)\n",
+								"sudo sed -i s/\\<INSERT_RANDOM_STRING_HERE\\>/$RANDOM_KEY/g /usr/local/src/security_monkey/env-config/config-deploy.py\n",
+								"sudo sed -i 's/DEBUG/", { "Ref": "SMLogLevel" }, "/g' /usr/local/src/security_monkey/env-config/config-deploy.py\n",
+								"sudo sed -i 's/securitymonkey@example.com/", { "Ref": "SMMailDefaultSender" }, "/g' /usr/local/src/security_monkey/env-config/config-deploy.py\n",
+								"sudo sed -i 's/SECURITY_TEAM_EMAIL\\ =\\ \\[\\]/SECURITY_TEAM_EMAIL\\ \\=\\ \\[\\ \"",{ "Ref": "SMSecurityTeamEmail" },"\"\\ \\]/g' /usr/local/src/security_monkey/env-config/config-deploy.py\n",
+								"sudo sed -i 's/EMAILS_USE_SMTP = False/EMAILS_USE_SMTP = ", { "Ref": "SMUseSMTP" }, "/g' /usr/local/src/security_monkey/env-config/config-deploy.py\n",
+								"sudo sed -i 's/smtp.example.com/", { "Ref": "SMMailServer" }, "/g' /usr/local/src/security_monkey/env-config/config-deploy.py\n",
+								"sudo sed -i 's/465/", { "Ref": "SMMailPort" }, "/g' /usr/local/src/security_monkey/env-config/config-deploy.py\n",
+								"sudo sed -i 's/username/", { "Ref": "SMMailUserName" }, "/g' /usr/local/src/security_monkey/env-config/config-deploy.py\n",
+								"sudo sed -i 's/password/", { "Ref": "SMMailPassword" }, "/g' /usr/local/src/security_monkey/env-config/config-deploy.py\n",
+								"export SECURITY_MONKEY_SETTINGS=/usr/local/src/security_monkey/env-config/config-deploy.py\n",
+								"cd /usr/local/src/security_monkey/\n",
+								"sudo -E python manage.py db upgrade\n",
+								"sudo chown www-data /var/log/security_monkey/securitymonkey.log\n",
+								"sudo cp /usr/local/src/security_monkey/supervisor/security_monkey.conf /etc/supervisor/conf.d/security_monkey.conf\n",
+								"sudo service supervisor restart\n",
+								"cd ~\n",
+								"sudo openssl genrsa -out server.key 2048\n",
+								"sudo openssl rsa -in server.key -out server.key.insecure\n",
+								"sudo mv server.key server.key.secure\n",
+								"sudo mv server.key.insecure server.key\n",
+								"sudo openssl req -new -key server.key -out server.csr -subj \"/C=US/ST=GA/L=Atlanta/O=Security/OU=IT Department/CN=example.com\"\n",
+								"sudo openssl x509 -req -days 365 -in server.csr -signkey server.key -out server.crt\n",
+								"sudo cp server.crt /etc/ssl/certs\n",
+								"sudo cp server.key /etc/ssl/private\n",
+								"sudo cat <<EOF > nginx-securitymonkey.conf\n",
+								"add_header X-Content-Type-Options \"nosniff\";\n",
+								"add_header X-XSS-Protection \"1; mode=block\";\n",
+								"add_header X-Frame-Options \"SAMEORIGIN\";\n",
+								"add_header Strict-Transport-Security \"max-age=631138519\";\n",
+								"add_header Content-Security-Policy \"default-src 'self'; font-src 'self' https://fonts.gstatic.com; script-src 'self' https://ajax.googleapis.com; style-src 'self' https://fonts.googleapis.com;\";\n",
+								"  \n",
+								"server {\n",
+								"listen      0.0.0.0:443 ssl;\n",
+								"ssl_certificate /etc/ssl/certs/server.crt;\n",
+								"ssl_certificate_key /etc/ssl/private/server.key;\n",
+								"access_log  /var/log/security_monkey/security_monkey.access.log;\n",
+								"error_log   /var/log/security_monkey/security_monkey.error.log;\n",
+								"location ~* ^/(reset|confirm|healthcheck|register|login|logout|api) {\n",
+								"    proxy_read_timeout 120;\n",
+								"    proxy_pass  http://127.0.0.1:5000;\n",
+								"    proxy_next_upstream error timeout invalid_header http_500 http_502 http_503 http_504;\n",
+								"    proxy_redirect off;\n",
+								"    proxy_buffering off;\n",
+								"    proxy_set_header        Host            \\$host;\n",
+								"    proxy_set_header        X-Real-IP       \\$remote_addr;\n",
+								"    proxy_set_header        X-Forwarded-For \\$proxy_add_x_forwarded_for;\n",
+								"}\n",
+								"location /static {\n",
+								"     rewrite ^/static/(.*)$ /\\$1 break;\n",
+								"     root /usr/local/src/security_monkey/security_monkey/static;\n",
+								"     index ui.html;\n",
+								"}\n",
+								"location / {\n",
+								"      root /usr/local/src/security_monkey/security_monkey/static;\n",
+								"      index ui.html;\n",
+								"}\n",
+								"}\n",
+								"EOF\n",
+								"sudo mv nginx-securitymonkey.conf /etc/nginx/sites-available/securitymonkey.conf\n",
+								"sudo ln -s /etc/nginx/sites-available/securitymonkey.conf /etc/nginx/sites-enabled/securitymonkey.conf\n",
+								"sudo rm /etc/nginx/sites-enabled/default\n",
+								"sudo service nginx restart\n"
+							]
+						]
+					}
+				}
+			}
+		},
+		"ToolsServer": {
+			"Type": "AWS::EC2::Instance",
+			"Properties": {
+				"IamInstanceProfile": { "Ref" : "SecurityMonkeyInstanceProfileRole" },
+				"KeyName": {
+					"Ref": "KeyName"
+				},
+				"Tags": [	{ "Key": "Name", "Value": {"Fn::Join" : ["", [  { "Ref": "AWS::StackName" }, "-Tools" ]]} }],
+				"ImageId": {
+					"Fn::FindInMap": [
+						"LINUXAMI", {
+							"Ref": "AWS::Region"
+						},
+						"AMI"
+					]
+				},
+				"AvailabilityZone": {
+					"Ref": "AZ1"
+				},
+				"SubnetId": {
+					"Ref": "SecurityMonkeySubnet"
+				},
+				"InstanceType": {
+					"Ref": "SecurityMonkeyInstanceType"
+				},
+				"SecurityGroupIds": [{
+					"Ref": "SecurityMonkeySecurityGroup"
+				}],
+				"UserData": {
+					"Fn::Base64": {
+						"Fn::Join": [
+							"", [
+								"#!/bin/bash -ex\n",
+								"sudo add-apt-repository universe\n",
+								"sudo add-apt-repository ppa:gift/stable\n",
+								"sudo apt-get update\n",
+								"sudo apt-get -y upgrade\n",
+								"sudo apt-get install -y python-pip python-dev python-psycopg2 python-virtualenv python-socks python-plaso redis-server libpq-dev nginx supervisor git libffi-dev awscli gcc make python-setuptools libyaml-dev libpython2.7-dev\n",
+								"sudo pip install pyopenssl ndg-httpsclient pyasn1 aws_ir boto3 flask zappa \n",
+								"mkdir -p aws-cfn-bootstrap-latest\n",
+								"curl https://s3.amazonaws.com/cloudformation-examples/aws-cfn-bootstrap-latest.tar.gz | tar xz -C aws-cfn-bootstrap-latest --strip-components 1\n",
+								"sudo easy_install aws-cfn-bootstrap-latest\n",
+								"sudo sed -i s/localhost/\"localhost $(hostname)\"/g /etc/hosts\n",
+								"#sudo wget --quiet -O - https://raw.github.com/sans-dfir/sift-bootstrap/master/bootstrap.sh | sudo bash -s -- -i\n",
+								"wget https://threatresponse-lime-modules.s3.amazonaws.com/REPO_SIGNING_KEY.asc\n",
+								"gpg --import REPO_SIGNING_KEY.asc\n",
+								"cd /opt\n",
+								"sudo git clone https://github.com/ThreatResponse/mad-king\n",
+								"sudo chown -R ubuntu:ubuntu /opt/mad-king\n",
+								"sudo git clone https://github.com/Alfresco/aws-cis-security-benchmark\n",
+								"sudo chown -R ubuntu:ubuntu /opt/aws-cis-security-benchmark\n"
+							]
+						]
+					}
+				}
+			}
+		}
+  },
+	"Outputs": {
+		"SecurityMonkeyServerOutput": {
+			"Description": "Web access to Security Monkey:",
+			"Value": {
+				"Fn::Join": [
+					"", ["https://", {
+						"Fn::GetAtt": ["SecurityMonkeyServer", "PublicDnsName"]
+					}, "/"]
+				]
+			}
+		},
+    "SecurityMonkeyInformation": {
+      "Description": "For SSH access (use your provided key and user ubuntu)",
+        "Value": {
+					"Fn::GetAtt": [	"SecurityMonkeyServer", "PublicDnsName"	]
+			}
+    },
+		"SecurityMonkeyNextStep": {
+      "Description": "Add your first user and AWS accounts following this instructions",
+        "Value": {
+					"Fn::Join": [
+						"", [ "http://securitymonkey.readthedocs.io/en/latest/quickstart.html#add-amazon-accounts"]
+					]
+				}
+    },
+		"ToolsInformation": {
+      "Description": "For SSH access (use your provided key and user ubuntu)",
+        "Value": {
+					"Fn::GetAtt": [	"ToolsServer", "PublicDnsName"	]
+			}
+    },
+		"DatabaseAddress": {
+			"Value": {
+				"Fn::GetAtt": [	"SecurityMonkeyRDS", "Endpoint.Address"	]
+			}
+		},
+		"DatabaseName": {
+			"Value": {
+				"Ref": "RDSDBName"
+			}
+		},
+		"DatabaseUserName": {
+			"Value": {
+				"Ref": "RDSUsername"
+			}
+		},
+		"DatabasePassword": {
+			"Value": {
+				"Ref": "RDSPassword"
+			}
+		},
+		"DatabasePort": {
+			"Value": {
+				"Fn::GetAtt": [ "SecurityMonkeyRDS", "Endpoint.Port" ]
+			}
+		}
+	}
+}
