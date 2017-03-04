@@ -25,7 +25,8 @@ See file __Automate or die - Rootedcon 2017.pptx__ in this repo. You can easily 
 * ```aws ec2 create-key-pair --key-name admin666 --output text```
 
 
-2- Mad-King attack (Tools Instance):
+2- Mad-King attack (Tools Instance): 
+[Demo Video mad-king](https://www.youtube.com/watch?v=9Jp9nGhpS0w) 
 
 * ```cd /opt/mad-king```
 * ```aws configure``` use valid keys 
@@ -33,14 +34,21 @@ See file __Automate or die - Rootedcon 2017.pptx__ in this repo. You can easily 
 * ```source bin/activate```
 * ```zappa deploy production``` and go to output URL
 
-3- Incident Response aws_ir (Tools Instance):
+3- Incident Response aws_ir (Tools Instance): 
+
+[Demo Video host compromise](https://www.youtube.com/watch?v=_UezvE0OGaA)
+
+[Demo Video key compromise](https://www.youtube.com/watch?v=-OY0L4BMyLY)
+
 
 * ```aws_ir key-compromise --access-key-id AKIAJTEST```
 * ```aws_ir instance-compromise --instance-ip IP --user centos --ssh-key ~/key-toplay.pem --repository-url https://threatresponse-lime-modules.s3.amazonaws.com```
 * ```volatility -f IP-2017-02-23T02\:15\:48-mem.lime imageinfo```
 * ```volatility -f IP-2017-02-23T02\:15\:48-mem.lime --profile=Ubuntu14043 linux_pslist```
 
-4- Hardening template, Prowler, SecurityMonkey
+4- Hardening template, Prowler, SecurityMonkey 
+
+[Demo Video](https://www.youtube.com/watch?v=xeAfXc9rIwU)
 
 * hardening template from [here](https://github.com/awslabs/aws-security-benchmark/tree/master/aws_cis_foundation_framework)
 * run prowler (ssh to Tools Instance, aws-cli must be configured)
